@@ -1,4 +1,3 @@
-use std::simd::f32x4;
 use alsa::nix::Error;
 use std::f32::consts::PI;
 

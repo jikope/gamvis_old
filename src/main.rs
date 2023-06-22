@@ -1,10 +1,9 @@
-#![feature(portable_simd)]
-
 use raylib::{ffi::MaximizeWindow, prelude::*};
 use std::collections::HashMap;
 use std::time::Duration;
 
 mod cqt;
+mod panel;
 mod pipes;
 
 type SampleFormat = f32;
@@ -30,6 +29,7 @@ const BG_COLOR: Color = Color {
     b: 0,
     a: 100,
 };
+
 const BAR_COLOR: Color = Color {
     r: 10,
     g: 100,
@@ -52,30 +52,29 @@ fn main() {
 
     // Mutables
     let mut bar_width_f = WIDTH as f32 / N_BINS as f32;
+    let mut width: i32 = WIDTH;
     let mut height: i32 = HEIGHT;
-    let mut curr_scale = Scale::Slendro;
     let mut note_y_position: i32 = height - 20;
+
+    // State
+    let mut curr_scale = Scale::Pelog;
+    let mut show_panel: bool = false;
 
     // Pitches
     // let chromatic: [&str; 12] = ["A", "A'", "B", "C", "C'", "D", "D'", "E", "F", "F'", "G", "G'",];
     let chromatic: [&str; 12] = ["A", "", "B", "C", "", "D", "", "E", "F", "", "G", ""];
-    let pelog = HashMap::from([
+    let mut pelog = HashMap::from([
         (14, "1"),
         (18, "2"),
         (22, "3"),
         (29, "4"),
-        (34, "5"),
-        (1, "6"),
-        (7, "7"),
-    ]);
-    let slendro = HashMap::from([
-        (15, "2"),
-        (22, "3"),
-        (29, "5"),
+        (33, "5"),
         (36, "6"),
-        (7, "1"),
+        (5, "7"),
     ]);
+    let slendro = HashMap::from([(15, "2"), (22, "3"), (29, "5"), (36, "6"), (7, "1")]);
 
+    // Audio input init
     let pcm = pipes::get_alsa_pcm("default", SAMPLE_RATE, NUM_CH).unwrap();
     let mut pipe: pipes::Pipe = pipes::Pipe {
         num_ch: NUM_CH,
@@ -84,15 +83,14 @@ fn main() {
         output: vec![0.0; N_BINS.into()],
         pcm,
     };
+
+    // CQT init
     let time_domain_kernel =
         cqt::init_time_domain_kernel(SAMPLE_RATE, fft_size, f_min, BINS_PER_OCTAVE, N_BINS)
             .unwrap();
 
     println!("buff size {}", pipe.input.len());
-    // unsafe {
-    //     exit(0);
-    // }
-
+    // Raylib init
     let (mut rl, thread) = raylib::init()
         .undecorated()
         .transparent()
@@ -101,11 +99,11 @@ fn main() {
         .title("Gamelan Visualizer")
         .build();
 
-    let roboto = rl
-        .load_font(&thread, font)
-        .expect("Unable to load font");
+    // Load font
+    let roboto = rl.load_font(&thread, font).expect("Unable to load font");
 
     let mut adder: i32 = 1;
+    let mut slider_value: i32 = 0;
 
     while !rl.window_should_close() {
         pipe.fill_input_buffer().unwrap();
@@ -125,10 +123,14 @@ fn main() {
             other_scale(&mut curr_scale);
         }
 
+        if d.is_key_pressed(KeyboardKey::KEY_P) {
+            show_panel = !show_panel;
+        }
+
         // Window Event
         if d.is_window_resized() {
-            println!("Resizeing");
             bar_width_f = d.get_screen_width() as f32 / N_BINS as f32;
+            width = d.get_screen_width();
             height = d.get_screen_height();
             note_y_position = height - 20;
         }
@@ -147,7 +149,7 @@ fn main() {
         let mut x = 0;
         let mut bar_color = BAR_COLOR;
         for i in 0..N_BINS as i32 {
-            let y: i32 = (pipe.output[i as usize] * 5000f32) as i32;
+            let y: i32 = (pipe.output[i as usize] * 6000f32) as i32;
             d.draw_rectangle(
                 x,
                 height - y - 20,
@@ -161,11 +163,11 @@ fn main() {
                 adder = 1;
             }
             bar_color.b += adder as u8;
-                
+
             x = (bar_width_f * i as f32) as i32;
         }
 
-        // Draw text
+        // Draw notes
         match curr_scale {
             Scale::Chromatic => {
                 let mut i = 0;
@@ -189,10 +191,25 @@ fn main() {
             }
             Scale::Pelog => {
                 let mut dissonance = 0;
+                let mut dissonance_adder = 3;
                 let mut octave = 1;
                 let mut counter = 1;
                 for n in 1..=N_BINS {
-                    let note = pelog.get(&counter);
+                    let mut index: i32;
+
+                    // Update slider
+                    if slider_value != 0 {
+                        index = counter + slider_value;
+                        if index > BINS_PER_OCTAVE as i32 {
+                            index -= BINS_PER_OCTAVE as i32;
+                        } else if index < 1 {
+                            index += BINS_PER_OCTAVE as i32;
+                        }
+                    } else {
+                        index = counter;
+                    }
+
+                    let note = pelog.get(&index);
                     if note.is_some() {
                         let note_str = note.unwrap();
                         let pos_x = (bar_width_f * n as f32) + dissonance as f32;
@@ -204,15 +221,17 @@ fn main() {
                             2.0,
                             Color::WHITE,
                         );
+
+                        dissonance += dissonance_adder;
                     }
 
                     counter += 1;
                     if (n % BINS_PER_OCTAVE) == 0 {
+                        if octave > 4 {
+                            dissonance_adder += 2;
+                        }
                         octave += 1;
                         counter = 1;
-                    }
-                    if octave >= 5 {
-                        dissonance += 1;
                     }
                 }
             }
@@ -233,18 +252,33 @@ fn main() {
                             2.0,
                             Color::WHITE,
                         );
+                        if octave >= 5 {
+                            dissonance += 2;
+                        }
                     }
 
                     counter += 1;
                     if (n % BINS_PER_OCTAVE) == 0 {
                         octave += 1;
                         counter = 1;
-                    if octave >= 5 {
-                        dissonance += 1;
-                    }
                     }
                 }
             }
+        }
+
+        // Option Panels
+        if show_panel {
+            slider_value = -1 * panel::draw_panel(
+                &mut d,
+                &roboto,
+                -1 * slider_value,
+                20.0,
+                (width as f32 * 0.1) as i32,
+                (height as f32 * 0.03) as i32,
+                300,
+                200,
+                Color::new(70, 70, 70, 180),
+            );
         }
     }
 
