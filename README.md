@@ -9,11 +9,9 @@ cargo run --release
 ```
 ## Keybindings
 
-|-----|-----------------------|
 | `s` | toggle between scales |
 | `f` | maximize window       |
 | `p` | show/hide panel       |
-|-----|-----------------------|
 
 ## Dependencies
 
