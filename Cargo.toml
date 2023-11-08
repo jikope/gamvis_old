@@ -13,4 +13,6 @@ readme = "README.md"
 
 [dependencies]
 alsa = "0.7.0"
+byteorder = "1.4.3"
+clap = "4.4.4"
 raylib = { version = "3.7" }

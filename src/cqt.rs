@@ -7,8 +7,8 @@ pub struct Complex {
     pub imag: f32,
 }
 
-impl Default for Complex {
-    fn default() -> Self {
+impl Complex {
+    fn zero() -> Self {
         Self { real: 0.0, imag: 0.0 }
     }
 }
@@ -31,7 +31,7 @@ pub fn init_time_domain_kernel(fs: u32, fft_size: u16, f_min: f32, bins_per_octa
     let alpha: f32 = f32::powf(2.0, 1.0 / bins_per_octave as f32) - 1.0;
 
     let mut time_domain_kernels: Vec<TimeKernel> = vec![{ TimeKernel {
-        signal: vec![Complex::default(); fft_size.into()],
+        signal: vec![Complex::zero(); fft_size.into()],
         len: fft_size,
         start: 0,
     }}; n_bins.into()];
@@ -80,13 +80,13 @@ pub fn init_time_domain_kernel(fs: u32, fft_size: u16, f_min: f32, bins_per_octa
 
 
 pub fn calc_cqt(input: &[f32], time_kernels: &[TimeKernel], n_bins: u16) -> Result<Vec<f32>, Box<Error>> {
-    let mut output: Vec<f32> = vec![0f32; n_bins as usize];
+    let mut output: Vec<f32> = vec![0.0; n_bins as usize];
     // assert_eq!(output.len() as u16, n_bins);
 
     // loop each cqt bin
     for k in 0..n_bins as usize {
         let time_kernel = &time_kernels[k];
-        let mut sum: Complex = Complex::default();
+        let mut sum = Complex::zero();
 
         // loop sample through start until end 
         for n in time_kernel.start as usize..(time_kernel.start + time_kernel.len) as usize {
