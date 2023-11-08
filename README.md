@@ -2,7 +2,8 @@
 
 Audio / Music visualizer written in rust. Shows musical spectrum in logarithmic way using Constant Q Transform. Currently support 3 scales (Chromatic, Pelog, Slendro).
 
-[]()
+https://github.com/jikope/gamvis/assets/42602197/4728bbe6-4f5f-4372-a4f8-bc0b8beab080
+
 
 ## How to run
 Alsa will grab audio input from default input device.
